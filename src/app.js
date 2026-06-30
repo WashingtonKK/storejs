@@ -25,6 +25,19 @@ function findProduct(id) {
   return products.find((product) => product.id === id);
 }
 
+function validateProduct(body) {
+  const name = (body.name || '').trim();
+  const errors = [];
+
+  if (name.length === 0) {
+    errors.push('Name can\'t be blank.');
+  } else if (name.length > 100) {
+    errors.push('Name is too long (maximum is 100 characters).');
+  }
+
+  return { name, errors };
+}
+
 app.get('/', (req, res) => {
   res.redirect('/products');
 });
@@ -42,10 +55,16 @@ app.get('/products/new', (req, res) => {
 });
 
 app.post('/products', (req, res) => {
+  const { name, errors } = validateProduct(req.body);
+
+  if (errors.length > 0) {
+    return res.status(422).render('products/new', { product: { name }, errors });
+  }
+
   const now = new Date();
   const product = {
     id: nextId,
-    name: req.body.name || '',
+    name,
     created_at: now,
     updated_at: now
   };
@@ -73,7 +92,16 @@ app.post('/products/:id', (req, res, next) => {
   const product = findProduct(Number(req.params.id));
   if (!product) return next();
 
-  product.name = req.body.name || '';
+  const { name, errors } = validateProduct(req.body);
+
+  if (errors.length > 0) {
+    return res.status(422).render('products/edit', {
+      product: { ...product, name },
+      errors
+    });
+  }
+
+  product.name = name;
   product.updated_at = new Date();
 
   setNotice(req, 'Product was successfully updated.');
