@@ -27,7 +27,7 @@ describe('Product CRUD', () => {
   it('new page loads', async () => {
     const response = await request(app).get('/products/new');
     expect(response.status).toBe(200);
-    expect(response.text).toContain('New product');
+    expect(response.text).toContain('New Product');
   });
 
   it('create increases product count and redirects correctly', async () => {
@@ -43,7 +43,7 @@ describe('Product CRUD', () => {
     expect(showResponse.text).toContain('Product was successfully created.');
 
     const indexResponse = await request(app).get('/products');
-    expect(indexResponse.text).toContain('Name: Desk lamp');
+    expect(indexResponse.text).toContain('Desk lamp');
   });
 
   it('show page loads', async () => {
@@ -51,7 +51,7 @@ describe('Product CRUD', () => {
 
     const response = await request(app).get('/products/1');
     expect(response.status).toBe(200);
-    expect(response.text).toContain('Name: Chair');
+    expect(response.text).toContain('Chair');
   });
 
   it('edit page loads', async () => {
@@ -59,7 +59,7 @@ describe('Product CRUD', () => {
 
     const response = await request(app).get('/products/1/edit');
     expect(response.status).toBe(200);
-    expect(response.text).toContain('Editing product');
+    expect(response.text).toContain('Edit Product');
   });
 
   it('update persists change and redirects correctly', async () => {
@@ -74,7 +74,7 @@ describe('Product CRUD', () => {
     expect(updateResponse.headers.location).toBe('/products/1');
 
     const showResponse = await request(app).get('/products/1');
-    expect(showResponse.text).toContain('Name: New Name');
+    expect(showResponse.text).toContain('New Name');
     expect(showResponse.text).toContain('Product was successfully updated.');
   });
 
@@ -87,12 +87,57 @@ describe('Product CRUD', () => {
     expect(deleteResponse.headers.location).toBe('/products');
 
     const indexResponse = await request(app).get('/products');
-    expect(indexResponse.text).not.toContain('Name: To Delete');
+    expect(indexResponse.text).not.toContain('To Delete');
     expect(indexResponse.text).toContain('Product was successfully deleted.');
   });
 
   it('returns 404 for missing product', async () => {
     const response = await request(app).get('/products/999');
     expect(response.status).toBe(404);
+  });
+
+  it('rejects creating a product with a blank name', async () => {
+    const response = await request(app)
+      .post('/products')
+      .type('form')
+      .send({ name: '   ' });
+
+    expect(response.status).toBe(422);
+    expect(response.text).toContain('be blank');
+
+    const indexResponse = await request(app).get('/products');
+    expect(indexResponse.text).toContain('No products yet');
+  });
+
+  it('rejects creating a product with a name over 100 characters', async () => {
+    const response = await request(app)
+      .post('/products')
+      .type('form')
+      .send({ name: 'a'.repeat(101) });
+
+    expect(response.status).toBe(422);
+    expect(response.text).toContain('Name is too long (maximum is 100 characters).');
+  });
+
+  it('trims whitespace from a valid name on create', async () => {
+    await request(app).post('/products').type('form').send({ name: '  Lamp  ' });
+
+    const showResponse = await request(app).get('/products/1');
+    expect(showResponse.text).toContain('<h1>Lamp</h1>');
+  });
+
+  it('rejects updating a product to a blank name and keeps the old value', async () => {
+    await request(app).post('/products').type('form').send({ name: 'Original' });
+
+    const updateResponse = await request(app)
+      .post('/products/1')
+      .type('form')
+      .send({ name: '' });
+
+    expect(updateResponse.status).toBe(422);
+    expect(updateResponse.text).toContain('be blank');
+
+    const showResponse = await request(app).get('/products/1');
+    expect(showResponse.text).toContain('Original');
   });
 });
