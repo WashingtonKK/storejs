@@ -77,4 +77,19 @@ systemctl start storejs
 sleep 2
 systemctl restart nginx
 
+echo "=== Health check ==="
+HTTP_STATUS=000
+for i in $(seq 1 30); do
+  HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/puppies || true)
+  [ "$HTTP_STATUS" = "200" ] && break
+  sleep 2
+done
+
+if [ "$HTTP_STATUS" != "200" ]; then
+  echo "Preview setup FAILED - health check returned HTTP $HTTP_STATUS"
+  systemctl status storejs --no-pager -l || true
+  journalctl -u storejs -n 40 --no-pager || true
+  exit 1
+fi
+
 echo "SETUP_COMPLETE"

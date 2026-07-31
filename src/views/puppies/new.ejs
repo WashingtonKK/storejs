@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>StoreJS — <%= product.name %></title>
+    <title>StoreJS — New puppy</title>
     <style>
       body { background: #0d1117; color: #c9d1d9; font-family: "Segoe UI", system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
       h1 { color: #f0883e; border-bottom: 1px solid #30363d; padding-bottom: 8px; }
@@ -31,21 +31,27 @@
   </head>
   <body>
     <div class="nav">
-      <a href="/products" class="btn">← Products</a>
+      <a href="/puppies" class="btn">← Puppies</a>
     </div>
 
-    <% if (notice) { %>
-      <div class="notice"><%= notice %></div>
+    <h1>🐶 New puppy</h1>
+
+    <% if (errors && errors.length > 0) { %>
+      <div class="error">
+        <% errors.forEach(function(error) { %>
+          <p><%= error %></p>
+        <% }) %>
+      </div>
     <% } %>
 
-    <h1><%= product.name %></h1>
-
-    <p>
-      <a href="/products/<%= product.id %>/edit" class="btn">Edit</a>
-    </p>
-
-    <form action="/products/<%= product.id %>/delete" method="post" style="margin-top: 24px;">
-      <button type="submit" class="btn-danger" style="background: #da3633; color: #fff; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer;">Delete</button>
+    <form action="/puppies" method="post">
+      <p>
+        <label for="name">Name</label>
+        <input id="name" name="name" type="text" value="<%= puppy.name %>" placeholder="Enter puppy name..." />
+      </p>
+      <p>
+        <button type="submit">Create Puppy 🐾</button>
+      </p>
     </form>
   </body>
 </html>

@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: Canvas
+metadata:
+  id: a6d6f81d-1fdf-4cea-adfc-345ce2cbf1c5
+  name: storejs-deploy-on-main
+  description: Auto-deploys storejs to the DigitalOcean prod droplet whenever main changes.
+spec:
+  nodes:
+    - id: trigger-main-push
+      name: GitHub Push (main)
+      type: TYPE_TRIGGER
+      component: github.onPush
+      integration: { id: 51a76317-1481-467b-b761-3bb11af1851e, name: "" }
+      configuration:
+        repository: storejs
+        refs:
+          - { type: equals, value: refs/heads/main }
+      position: { x: 120, y: 100 }
+
+    - id: get-prod-droplet
+      name: Get Prod Droplet
+      type: TYPE_ACTION
+      component: digitalocean.getDroplet
+      integration: { id: 505ed7fc-cc70-4226-8ff6-50e3ef601b8d, name: "" }
+      configuration:
+        droplet: "575470632"
+      position: { x: 720, y: 100 }
+
+    - id: deploy-over-ssh
+      name: Deploy to Prod Droplet
+      type: TYPE_ACTION
+      component: ssh
+      configuration:
+        host: '{{ filter($["Get Prod Droplet"].data.networks.v4, .type == "public")[0].ip_address }}'
+        port: 22
+        username: root
+        authentication:
+          authMethod: ssh_key
+          privateKey: { secret: STOREJS_SSH_DO, key: private_key }
+        environment:
+          - { name: DEPLOY_SHA, value: '{{ root().data.after }}' }
+        commands: |
+          cd /opt/storejs
+          git fetch origin main
+          git checkout "$DEPLOY_SHA" -- scripts/deploy.sh
+          bash scripts/deploy.sh "$DEPLOY_SHA"
+        timeout: 300
+        connectionRetry: { enabled: true, retries: 5, intervalSeconds: 15 }
+      position: { x: 1320, y: 100 }
+
+  edges:
+    - { sourceId: trigger-main-push, targetId: get-prod-droplet, channel: default }
+    - { sourceId: get-prod-droplet, targetId: deploy-over-ssh, channel: default }

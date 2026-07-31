@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: Canvas
+metadata:
+  id: 1b1c1566-ed6a-40fe-a210-1323e69d1bfd
+  name: storejs-preview-on-pr
+  description: Creates a DigitalOcean preview droplet when a PR is opened and comments the URL on GitHub.
+spec:
+  nodes:
+    - id: trigger-pr-opened
+      name: GitHub PR Opened
+      type: TYPE_TRIGGER
+      component: github.onPullRequest
+      integration: { id: 51a76317-1481-467b-b761-3bb11af1851e, name: "" }
+      configuration:
+        repository: storejs
+        actions:
+          - opened
+        customName: 'PR #{{ root().data.number }} preview'
+      position: { x: 120, y: 100 }
+
+    - id: create-preview-droplet
+      name: Create Preview Droplet
+      type: TYPE_ACTION
+      component: digitalocean.createDroplet
+      integration: { id: 505ed7fc-cc70-4226-8ff6-50e3ef601b8d, name: "" }
+      configuration:
+        name: 'storejs-pr-{{ root().data.number }}'
+        region: nyc3
+        size: s-1vcpu-1gb
+        image: ubuntu-24-04-x64
+        sshKeys:
+          - "49:91:c4:08:05:2c:19:a4:f3:cf:6d:f4:27:4a:57:68"
+        tags:
+          - storejs-preview
+          - 'pr-{{ root().data.number }}'
+      position: { x: 720, y: 100 }
+
+    - id: wait-for-boot
+      name: Wait for Boot
+      type: TYPE_ACTION
+      component: wait
+      configuration:
+        mode: interval
+        waitFor: "45"
+        unit: seconds
+      position: { x: 1320, y: 100 }
+
+    - id: setup-preview
+      name: Setup Preview
+      type: TYPE_ACTION
+      component: ssh
+      configuration:
+        host: '{{ filter($["Create Preview Droplet"].data.networks.v4, .type == "public")[0].ip_address }}'
+        port: 22
+        username: root
+        authentication:
+          authMethod: ssh_key
+          privateKey: { secret: STOREJS_SSH_DO, key: private_key }
+        environment:
+          - { name: PR_NUMBER, value: '{{ root().data.number }}' }
+        commands: |
+          curl -fsSL https://raw.githubusercontent.com/puppies-inc/storejs/main/scripts/preview-setup.sh -o /tmp/preview-setup.sh
+          bash /tmp/preview-setup.sh
+        timeout: 900
+        connectionRetry: { enabled: true, retries: 20, intervalSeconds: 15 }
+      position: { x: 1920, y: 100 }
+
+    - id: comment-preview-url
+      name: Comment Preview URL
+      type: TYPE_ACTION
+      component: github.createIssueComment
+      integration: { id: 51a76317-1481-467b-b761-3bb11af1851e, name: "" }
+      configuration:
+        repository: storejs
+        issueNumber: '{{ root().data.number }}'
+        body: |
+          ## 🐶 Preview deployment
+
+          Your preview environment is ready:
+
+          **URL:** http://{{ filter($["Create Preview Droplet"].data.networks.v4, .type == "public")[0].ip_address }}/puppies
+
+          Deployed for PR #{{ root().data.number }}.
+      position: { x: 2520, y: 100 }
+
+  edges:
+    - { sourceId: trigger-pr-opened, targetId: create-preview-droplet, channel: default }
+    - { sourceId: create-preview-droplet, targetId: wait-for-boot, channel: default }
+    - { sourceId: wait-for-boot, targetId: setup-preview, channel: default }
+    - { sourceId: setup-preview, targetId: comment-preview-url, channel: success }

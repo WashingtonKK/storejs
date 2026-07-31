@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>StoreJS — Products</title>
+    <title>StoreJS — Editing puppy</title>
     <style>
       body { background: #0d1117; color: #c9d1d9; font-family: "Segoe UI", system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
       h1 { color: #f0883e; border-bottom: 1px solid #30363d; padding-bottom: 8px; }
@@ -31,28 +31,27 @@
   </head>
   <body>
     <div class="nav">
-      <a href="/products" class="btn">Products</a>
-      <a href="/products/new" class="btn">+ New</a>
-      <a href="/about">About</a>
+      <a href="/puppies/<%= puppy.id %>" class="btn">← Back</a>
     </div>
 
-    <% if (notice) { %>
-      <div class="notice"><%= notice %></div>
+    <h1>🐶 Editing puppy</h1>
+
+    <% if (errors && errors.length > 0) { %>
+      <div class="error">
+        <% errors.forEach(function(error) { %>
+          <p><%= error %></p>
+        <% }) %>
+      </div>
     <% } %>
 
-    <h1>Products</h1>
-
-    <% if (products.length === 0) { %>
-      <p class="empty">No products yet. Create your first one!</p>
-    <% } %>
-
-    <ul>
-      <% products.forEach(function(product) { %>
-        <li>
-          <span><%= product.name %></span>
-          <a href="/products/<%= product.id %>" class="btn">View →</a>
-        </li>
-      <% }) %>
-    </ul>
+    <form action="/puppies/<%= puppy.id %>" method="post">
+      <p>
+        <label for="name">Name</label>
+        <input id="name" name="name" type="text" value="<%= puppy.name %>" />
+      </p>
+      <p>
+        <button type="submit">Update Puppy 🐾</button>
+      </p>
+    </form>
   </body>
 </html>

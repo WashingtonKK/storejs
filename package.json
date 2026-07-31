@@ -4,12 +4,20 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "start": "node src/server.js",
+    "start": "node --require ./src/instrumentation.js src/server.js",
     "dev": "node --watch src/server.js",
     "test": "vitest run",
     "daytona:prepare": "bash scripts/daytona-prepare-sandbox.sh"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/auto-instrumentations-node": "^0.76.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.218.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.218.0",
+    "@opentelemetry/resources": "^2.2.0",
+    "@opentelemetry/sdk-metrics": "^2.7.1",
+    "@opentelemetry/sdk-node": "^0.218.0",
+    "@opentelemetry/semantic-conventions": "^1.39.0",
     "ejs": "^3.1.10",
     "express": "^4.21.2"
   },

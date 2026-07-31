@@ -2,13 +2,13 @@
 
 ## Goal
 
-Build a minimal demo web app in Node.js that shows a complete CRUD flow for a single entity: `Product`.
+Build a minimal demo web app in Node.js that shows a complete CRUD flow for a single entity: `Puppy`.
 
 The app should be intentionally simple, readable, and easy to demo.
 
 ## Product Scope
 
-- Single domain entity: `Product`
+- Single domain entity: `Puppy`
 - Single user-facing attribute: `name`
 - No additional business entities
 - Puppies maybe?
@@ -25,19 +25,19 @@ The app should be intentionally simple, readable, and easy to demo.
 
 ### 1. Routing
 
-- `GET /` shows product index (homepage must be product management entry point)
-- Standard product CRUD routes:
-  - `GET /products`
-  - `GET /products/new`
-  - `POST /products`
-  - `GET /products/:id`
-  - `GET /products/:id/edit`
-  - `POST /products/:id` (or `PATCH/PUT` if framework supports method override cleanly)
-  - `POST /products/:id/delete` (or `DELETE` with method override)
+- `GET /` shows puppy index (homepage must be puppy management entry point)
+- Standard puppy CRUD routes:
+  - `GET /puppies`
+  - `GET /puppies/new`
+  - `POST /puppies`
+  - `GET /puppies/:id`
+  - `GET /puppies/:id/edit`
+  - `POST /puppies/:id` (or `PATCH/PUT` if framework supports method override cleanly)
+  - `POST /puppies/:id/delete` (or `DELETE` with method override)
 
 ### 2. Data Model
 
-`Product` fields:
+`Puppy` fields:
 - `id` (primary key)
 - `name` (string)
 - timestamps if easy (`created_at`, `updated_at`)
@@ -48,46 +48,46 @@ Validation requirement:
 
 ### 3. HTML Pages
 
-#### Index (`/` and `/products`)
-- Heading: `Products`
-- List all products
-- For each product:
+#### Index (`/` and `/puppies`)
+- Heading: `Puppies`
+- List all puppies
+- For each puppy:
   - show `Name: <value>`
-  - show link to product detail page
-- Show `New product` action
+  - show link to puppy detail page
+- Show `New puppy` action
 
-#### New (`/products/new`)
-- Heading: `New product`
+#### New (`/puppies/new`)
+- Heading: `New puppy`
 - Form with:
   - label/input for `name`
   - submit action
-- Link back to products index
+- Link back to puppies index
 
-#### Show (`/products/:id`)
-- Display product name
+#### Show (`/puppies/:id`)
+- Display puppy name
 - Actions:
   - edit
   - delete
   - back to index
 
-#### Edit (`/products/:id/edit`)
-- Heading: `Editing product`
+#### Edit (`/puppies/:id/edit`)
+- Heading: `Editing puppy`
 - Same form fields as New
 - Links to show page and index
 
 ### 4. CRUD Behavior
 
 - Create:
-  - saves product
-  - redirects to product show page
+  - saves puppy
+  - redirects to puppy show page
   - displays success notice
 - Update:
-  - updates product
-  - redirects to product show page
+  - updates puppy
+  - redirects to puppy show page
   - displays success notice
 - Delete:
-  - removes product
-  - redirects to products index
+  - removes puppy
+  - redirects to puppies index
   - displays success notice
 
 ### 5. UI Guidelines
@@ -98,7 +98,7 @@ Validation requirement:
 
 ### 6. Error Handling
 
-- If a product id does not exist, return a normal 404 page/response.
+- If a puppy id does not exist, return a normal 404 page/response.
 - If form submission fails (if validations are introduced), re-render form with visible errors.
 
 ## Testing Requirements
@@ -106,17 +106,17 @@ Validation requirement:
 Implement basic automated tests for:
 - index page loads
 - new page loads
-- create increases product count and redirects correctly
+- create increases puppy count and redirects correctly
 - show page loads
 - edit page loads
 - update persists change and redirects correctly
-- delete decreases product count and redirects correctly
+- delete decreases puppy count and redirects correctly
 
 Keep tests fast and simple.
 
 ## Acceptance Criteria
 
-1. User can create, view, edit, and delete products via HTML pages.
-2. `/` resolves to products index.
+1. User can create, view, edit, and delete puppies via HTML pages.
+2. `/` resolves to puppies index.
 3. Success notices are shown after create/update/delete.
 4. UI remains intentionally minimal.
