@@ -1,174 +1,212 @@
-# AGENTS.md - Guidance for AI Coding Agents
+# AGENTS.md — Guidance for AI Coding Agents
 
-This document provides guidance for AI coding agents working on the `storejs` project.
+This document gives AI coding agents the context they need to work effectively
+on the `storejs` repository. Read it before making changes, and keep it in sync
+with the code when you touch the areas it describes.
 
 ## Project Overview
 
-`storejs` is a minimal Node.js CRUD demo application built with Express.js and EJS templating. It demonstrates basic web application patterns including:
-- Express server setup and routing
-- EJS templating for view rendering
-- In-memory data storage (non-persistent)
-- OpenTelemetry instrumentation for observability
+`storejs` is a deliberately minimal Node.js web app that demonstrates a complete
+CRUD flow for a single domain entity: `Puppy`. It is meant to be simple,
+readable, and easy to demo.
 
-## Build Instructions
+Tech stack:
+- Express.js (^4.21.2) for HTTP routing
+- EJS (^3.1.10) for server-rendered HTML views
+- In-memory storage (a plain array — non-persistent, resets on restart)
+- OpenTelemetry for traces and metrics (exported over OTLP/HTTP)
+- Vitest (^3.2.4) + supertest (^7.1.1) for testing
+
+See `spec.md` for the functional specification and `README.md` for user-facing
+docs.
+
+## Build, Run, and Test
 
 ### Prerequisites
-- Node.js (v18+)
-- npm (v9+)
+- Node.js 20+ (CI uses 20; local dev has been verified on 22)
+- npm 9+
 
-### Build Steps
+### Commands
 
 ```bash
 # Install dependencies
 npm install
 
-# Verify the build with tests
-npm test
+# Run the test suite once (this is what `npm test` does)
+npm test            # -> vitest run
 
-# Start the development server
-npm start
+# Watch mode during development
+npx vitest          # or: npx vitest --watch
+
+# Start the server WITH OpenTelemetry instrumentation
+npm start           # node --require ./src/instrumentation.js src/server.js
+
+# Start with auto-reload, WITHOUT instrumentation
+npm run dev         # node --watch src/server.js
 ```
 
-The application listens on `http://localhost:3000` by default and respects the `PORT` environment variable for deployment scenarios.
+The server listens on `http://localhost:3000` by default and honours the `PORT`
+environment variable. The app is mounted at `/` and redirects to `/puppies`.
 
-## Testing
-
-This project uses **Vitest** as the test runner.
-
-### Running Tests
-
-```bash
-# Run all tests once
-npm test
-
-# Run tests in watch mode (useful during development)
-npm run test -- --watch
-```
-
-### Test Location
-- Test files are located in the `test/` directory
-- Test files use the pattern: `*.test.js`
-
-### Test Coverage Expectations
-- API endpoints should have corresponding tests
-- Critical business logic should be unit tested
-- Integration tests should validate express routes and handlers
+Important: instrumentation is only loaded for `npm start` (via `--require`). The
+`dev` script and the tests import `src/app.js` directly and do NOT start the
+OpenTelemetry SDK, so tests run without needing an OTLP endpoint.
 
 ## Repository Structure
 
 ```
 .
 ├── src/
-│   ├── server.js              # Main Express application
-│   ├── instrumentation.js     # OpenTelemetry setup
-│   └── [other modules]
+│   ├── app.js                 # Express app: routes, in-memory store, exports `app`
+│   ├── server.js              # Thin entrypoint: requires app and calls listen()
+│   ├── metrics.js             # OpenTelemetry business metrics (counters)
+│   ├── instrumentation.js     # OpenTelemetry NodeSDK setup (loaded via --require)
+│   └── views/
+│       ├── about.ejs          # Static About page
+│       └── puppies/
+│           ├── index.ejs      # List puppies
+│           ├── new.ejs        # Create form
+│           ├── show.ejs       # Single puppy
+│           └── edit.ejs       # Edit form
 ├── test/
-│   └── *.test.js              # Test files
+│   └── app.test.js            # supertest + vitest integration tests
 ├── scripts/
-│   └── daytona-prepare-sandbox.sh
-├── .github/
-│   └── workflows/             # CI/CD configurations
-├── package.json               # Project dependencies and scripts
+│   ├── daytona-prepare-sandbox.sh  # Bootstraps a Daytona sandbox and runs tests
+│   ├── deploy.sh                   # Pull latest, install, restart systemd service
+│   └── preview-setup.sh            # Provision a VM (Node + nginx) for previews
+├── .github/workflows/ci.yml   # CI: install deps on Node 20 (see caveat below)
+├── package.json               # Scripts and dependencies
 ├── package-lock.json          # Locked dependency versions
-├── README.md                  # User-facing documentation
-├── spec.md                    # Technical specifications
-├── render.yaml                # Render.com deployment config
-├── vitest.config.cjs          # Vitest configuration
+├── README.md                  # User-facing docs
+├── spec.md                    # Functional specification
+├── render.yaml                # Render.com Blueprint deployment config
+├── vitest.config.cjs          # Vitest config (globals enabled)
 └── .gitignore
 ```
 
-## Key Dependencies
+## Application Architecture
 
-- **express** (^4.21.2) - Web framework
-- **ejs** (^3.1.10) - Templating engine
-- **@opentelemetry/* - Observability and instrumentation
-- **supertest** (^7.1.1) - HTTP testing (dev)
-- **vitest** (^3.2.4) - Test runner (dev)
+- `src/app.js` builds and exports the Express `app` but never calls `listen()`.
+  This separation lets tests import the app directly with supertest.
+- `src/server.js` imports the app and starts the HTTP listener. It is the only
+  place `app.listen` is called.
+- State lives in module-level variables in `app.js`: a `puppies` array and a
+  `nextId` counter. There is no database.
+- `app.resetStore()` clears the store and notice. Tests call it in `beforeEach`
+  to guarantee isolation — reuse it if you add stateful tests.
+- Flash-style notices use `app.locals.notice`: a route sets it, a middleware
+  copies it to `res.locals.notice` for the next render, then clears it.
+- A catch-all middleware returns a plain `404 Not Found` for unknown routes and
+  for missing puppy ids (handlers call `next()` when a puppy is not found).
 
-## Development Workflow
+### Routes
 
-### Adding Features
+| Method | Path                  | Purpose                                  |
+|--------|-----------------------|------------------------------------------|
+| GET    | `/`                   | Redirects (302) to `/puppies`            |
+| GET    | `/puppies`            | List all puppies                         |
+| GET    | `/about`              | Static About page                        |
+| GET    | `/puppies/new`        | New puppy form                           |
+| POST   | `/puppies`            | Create puppy, redirect to show           |
+| GET    | `/puppies/:id`        | Show a puppy                             |
+| GET    | `/puppies/:id/edit`   | Edit puppy form                          |
+| POST   | `/puppies/:id`        | Update puppy, redirect to show           |
+| POST   | `/puppies/:id/delete` | Delete puppy, redirect to index          |
 
-1. **Understand the current structure** - Review `src/server.js` to understand routing patterns
-2. **Create/modify application code** - Follow existing patterns and conventions
-3. **Add tests first** - Write tests in `test/` before implementing features
-4. **Run tests locally** - Ensure `npm test` passes
-5. **Verify the app runs** - Confirm `npm start` works without errors
+### Data Model
 
-### Code Quality Guidelines
+`Puppy`: `{ id, name, created_at, updated_at }`. `name` may be empty (validation
+is intentionally lightweight per the spec).
 
-- Follow the existing code style (consistent indentation, naming conventions)
-- Use descriptive variable and function names
-- Keep functions focused and testable
-- Document complex logic with comments
-- Ensure no console errors or warnings during development
+## Testing
 
-### Testing Expectations
+- Runner: Vitest. `vitest.config.cjs` sets `globals: true`, so `describe`,
+  `it`, `expect`, and `beforeEach` are available without importing them.
+- HTTP assertions use `supertest` against the exported Express `app`.
+- Test files live in `test/` and follow the `*.test.js` pattern.
 
-- All new endpoint handlers should have corresponding tests
-- Tests should be isolated and independent
-- Use descriptive test names that explain what is being tested
-- Aim for meaningful coverage of critical paths
+Conventions to follow when adding tests:
+- Call `app.resetStore()` in `beforeEach` so state does not leak between tests.
+- Assert on both status codes and rendered text (the existing tests check for
+  strings like `Name: <value>`, `New puppy`, and `Editing puppy`). When you
+  change a view, update the tests that assert on its text, and vice versa.
+- Cover new routes/handlers with at least a happy path and a not-found path.
 
-## Data Storage
+Run `npm test` locally before committing — see the CI caveat below.
 
-**Important:** Data is stored in-memory and will reset when the process restarts or redeploys.
+## Observability (OpenTelemetry)
 
-This is intentional for a demo application. If persistent storage is needed in the future, consider:
-- Adding a database layer (e.g., SQLite, PostgreSQL)
-- Implementing a data initialization strategy
-- Adding data validation and schema enforcement
-
-## Deployment
-
-The project includes `render.yaml` for Blueprint deployments on Render.com.
-
-### Build & Start Commands
-- **Build:** `npm install`
-- **Start:** `npm start`
-
-### Port Configuration
-The application respects `process.env.PORT`, making it compatible with Render web services.
+- `src/metrics.js` defines business metrics on the `storejs-business` meter:
+  - `store.puppies.created` (counter)
+  - `store.puppies.deleted` (counter)
+  - `store.puppies.total` (up/down counter)
+  Increment these when you add create/delete-like operations.
+- `src/instrumentation.js` configures the Node SDK with auto-instrumentations
+  plus OTLP trace and metric exporters. It reads:
+  - `OTEL_EXPORTER_OTLP_ENDPOINT` (default: Dash0 europe-west4 ingress)
+  - `DASH0_TOKEN` (sent as a Bearer auth header when present)
+  - `NODE_ENV` (used for `deployment.environment`; default `production`)
+- Do not commit secrets. `DASH0_TOKEN` must come from the environment.
 
 ## Environment Variables
 
-- `PORT` - Server port (default: 3000)
-- `OTEL_*` - OpenTelemetry configuration variables (optional for observability)
+| Variable                       | Purpose                                   | Default        |
+|--------------------------------|-------------------------------------------|----------------|
+| `PORT`                         | HTTP listen port                          | `3000`         |
+| `NODE_ENV`                     | Deployment environment tag for OTel       | `production`   |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`  | OTLP base URL for traces/metrics          | Dash0 ingress  |
+| `DASH0_TOKEN`                  | Bearer token for the OTLP exporter        | (unset)        |
+
+## Deployment
+
+- `render.yaml` defines a Render.com Blueprint web service:
+  - Build: `npm install`
+  - Start: `npm start`
+  - Uses `process.env.PORT`, so it is Render-compatible.
+- `scripts/deploy.sh` deploys to a self-managed host: it fetches `origin/main`
+  (or a ref argument), `git reset --hard`, `npm install --production`, restarts
+  the `storejs` systemd unit, and polls `GET /puppies` for a `200` health check.
+- `scripts/preview-setup.sh` provisions a fresh VM (installs Node 22 and nginx,
+  clones the repo, runs the app behind an nginx reverse proxy) for previews.
+- `scripts/daytona-prepare-sandbox.sh` (also `npm run daytona:prepare`) bootstraps
+  a Daytona sandbox, clones the repo with `GITHUB_TOKEN`, and runs the tests.
 
 ## CI/CD
 
-The project includes GitHub Actions workflows in `.github/workflows/`. Ensure:
-- All tests pass before pushing
-- CI checks pass before merging
-- No console errors or security warnings
+`.github/workflows/ci.yml` runs on `pull_request`, checks out the code, sets up
+Node 20, and runs `npm ci`.
 
-## Troubleshooting
+Caveat: the current CI job installs dependencies but does not execute the test
+suite (it only echoes a success message). Do not rely on CI to catch test
+failures — always run `npm test` locally before pushing. If you strengthen CI,
+adding `npm test` to this workflow is a sensible, in-scope improvement.
 
-### Tests Failing
-- Ensure dependencies are installed: `npm install`
-- Check that the server can start without errors
-- Review test output for specific error messages
+## Working Conventions
 
-### Server Not Starting
-- Check for port conflicts: `lsof -i :3000`
-- Verify all dependencies installed correctly: `npm install`
-- Review `src/instrumentation.js` for telemetry configuration issues
+- Match the existing style: two-space indentation, CommonJS (`require`/
+  `module.exports`, `"type": "commonjs"`), and small focused functions.
+- Keep the app minimal and readable — this is a demo. Avoid introducing new
+  frameworks, a database, auth, or heavy abstractions unless the task asks for it
+  (see the "Out of Scope" list in `spec.md`).
+- Keep views, routes, tests, and `spec.md` consistent with each other. If you
+  rename UI text that a test asserts on, update both.
+- Respect the in-memory storage constraint: data resets on restart. Do not
+  assume persistence.
+- Never commit secrets or tokens.
 
-### Port Already in Use
-- Change the PORT: `PORT=3001 npm start`
-- Or kill the process: `kill -9 $(lsof -t -i:3000)`
+## Pre-Change Checklist
 
-## Questions for Agent Developers
-
-When working on this repository, ask yourself:
-- Does my change follow the existing patterns?
-- Have I added tests for new functionality?
-- Will this change work in the Render deployment environment?
-- Am I respecting the in-memory storage constraints?
-- Have I checked for console errors/warnings?
+Before opening a PR, confirm:
+- [ ] `npm install` succeeds
+- [ ] `npm test` passes locally
+- [ ] `npm start` boots without errors
+- [ ] New routes/handlers have tests (happy path + not-found)
+- [ ] Business metrics updated if you added create/delete-style operations
+- [ ] `spec.md` / `README.md` updated if behaviour or setup changed
+- [ ] No secrets committed
 
 ## Related Documentation
 
-- See `README.md` for user-facing documentation
-- See `spec.md` for technical specifications
-- See test files for usage examples
+- `README.md` — how to run and deploy the app
+- `spec.md` — functional requirements and acceptance criteria
+- `test/app.test.js` — executable examples of expected behaviour
